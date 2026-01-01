@@ -6,6 +6,7 @@ let currentBookingId = null;
 let bookingsData = [];
 let expensesData = [];
 let usersData = [];
+let calendar; // متغير للتقويم
 
 /**
  * تهيئة لوحة التحكم
@@ -22,14 +23,26 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadDashboardData() {
     try {
+        // تحميل الإحصائيات
         await loadStatistics();
-        await loadBookings(); // بعد تحميل الحجوزات
-        initCalendar(); // <-- تشغيل التقويم
+        
+        // تحميل الحجوزات
+        await loadBookings();
+        
+        // تشغيل التقويم بعد تحميل الحجوزات
+        initCalendar(); 
+        
+        // تحميل المصروفات
         await loadExpenses();
+        
+        // تحميل المستخدمين
         await loadUsers();
+        
+        // تحميل الإعدادات
         await loadSettings();
     } catch (error) {
-        console.error('Error:', error);
+        console.error('خطأ في تحميل البيانات:', error);
+        showToast('حدث خطأ في تحميل البيانات', 'error');
     }
 }
 
@@ -70,6 +83,13 @@ async function loadBookings() {
         displayBookingsTable();
         displayRevenueTable();
         displayPendingTable();
+        
+        // تحديث التقويم إذا كان مفتوحاً
+        if (calendar) {
+            calendar.removeAllEvents();
+            const events = getCalendarEvents();
+            calendar.addEventSource(events);
+        }
     }
 }
 
@@ -119,6 +139,88 @@ async function loadSettings() {
     }
 }
 
+// ============================================
+// دوال التقويم (New Calendar Functions)
+// ============================================
+
+/**
+ * تجهيز بيانات الحجوزات للتقويم
+ */
+function getCalendarEvents() {
+    return bookingsData.map(booking => ({
+        title: `${booking.customerName} (${formatCurrency(booking.remaining)})`,
+        start: dateToISO(booking.date),
+        backgroundColor: booking.paymentStatus === 'مكتمل' ? '#27ae60' : 
+                        booking.paymentStatus === 'معلق' ? '#e74c3c' : '#f39c12',
+        borderColor: 'transparent',
+        extendedProps: { bookingId: booking.id }
+    }));
+}
+
+/**
+ * تهيئة وتشغيل التقويم
+ */
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        direction: 'rtl',
+        locale: 'ar-sa',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth'
+        },
+        height: 550,
+        events: getCalendarEvents(),
+        
+        // عند النقر على يوم
+        dateClick: function(info) {
+            handleDateClick(info.dateStr);
+        },
+        
+        // عند النقر على حجز موجود
+        eventClick: function(info) {
+            editBooking(info.event.extendedProps.bookingId);
+        }
+    });
+
+    calendar.render();
+}
+
+/**
+ * معالجة النقر على التاريخ في التقويم
+ */
+function handleDateClick(dateStr) {
+    // البحث عن حجوزات في هذا اليوم
+    const bookingsOnDay = bookingsData.filter(b => dateToISO(b.date) === dateStr);
+
+    if (bookingsOnDay.length > 0) {
+        Swal.fire({
+            title: `حجوزات يوم ${dateStr}`,
+            text: `يوجد ${bookingsOnDay.length} حجز في هذا اليوم. ماذا تريد أن تفعل؟`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'إضافة حجز جديد',
+            cancelButtonText: 'إلغاء',
+            confirmButtonColor: '#3498db',
+            cancelButtonColor: '#95a5a6'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showAddBookingForm(dateStr);
+            }
+        });
+    } else {
+        showAddBookingForm(dateStr);
+    }
+}
+
+// ============================================
+// دوال العرض (Tables & UI)
+// ============================================
+
 /**
  * عرض جدول الحجوزات
  */
@@ -151,12 +253,12 @@ function displayBookingsTable() {
         const statusBadge = getStatusBadge(booking.paymentStatus);
         html += `
             <tr>
-                <td>${formatDate(booking.date)}</td>
+                <td class="num-en">${formatDate(booking.date)}</td>
                 <td>${booking.customerName}</td>
-                <td>${booking.phone}</td>
-                <td>${formatCurrency(booking.totalAmount)}</td>
-                <td>${formatCurrency(booking.deposit)}</td>
-                <td>${formatCurrency(booking.remaining)}</td>
+                <td class="num-en">${booking.phone}</td>
+                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
+                <td class="num-en">${formatCurrency(booking.deposit)}</td>
+                <td class="num-en">${formatCurrency(booking.remaining)}</td>
                 <td>${statusBadge}</td>
                 <td>
                     <button class="btn-action edit" onclick="editBooking(${booking.id})" title="تعديل">
@@ -208,9 +310,9 @@ function displayRevenueTable() {
         totalRevenue += booking.totalAmount;
         html += `
             <tr>
-                <td>${formatDate(booking.date)}</td>
+                <td class="num-en">${formatDate(booking.date)}</td>
                 <td>${booking.customerName}</td>
-                <td>${formatCurrency(booking.totalAmount)}</td>
+                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
                 <td><span class="badge badge-success">مكتمل</span></td>
             </tr>
         `;
@@ -220,7 +322,7 @@ function displayRevenueTable() {
             </tbody>
         </table>
         <div class="mt-3">
-            <strong>إجمالي الإيرادات: ${formatCurrency(totalRevenue)}</strong>
+            <strong>إجمالي الإيرادات: <span class="num-en">${formatCurrency(totalRevenue)}</span></strong>
         </div>
     `;
     
@@ -261,10 +363,10 @@ function displayPendingTable() {
         const statusBadge = getStatusBadge(booking.paymentStatus);
         html += `
             <tr>
-                <td>${formatDate(booking.date)}</td>
+                <td class="num-en">${formatDate(booking.date)}</td>
                 <td>${booking.customerName}</td>
-                <td>${booking.phone}</td>
-                <td>${formatCurrency(booking.remaining)}</td>
+                <td class="num-en">${booking.phone}</td>
+                <td class="num-en">${formatCurrency(booking.remaining)}</td>
                 <td>${statusBadge}</td>
                 <td>
                     <button class="btn-action edit" onclick="recordPayment(${booking.id})" title="تسجيل دفع">
@@ -282,7 +384,7 @@ function displayPendingTable() {
             </tbody>
         </table>
         <div class="mt-3">
-            <strong>إجمالي المبلغ المعلق: ${formatCurrency(totalPending)}</strong>
+            <strong>إجمالي المبلغ المعلق: <span class="num-en">${formatCurrency(totalPending)}</span></strong>
         </div>
     `;
     
@@ -319,10 +421,10 @@ function displayExpensesTable() {
         totalExpenses += expense.amount;
         html += `
             <tr>
-                <td>${formatDate(expense.date)}</td>
+                <td class="num-en">${formatDate(expense.date)}</td>
                 <td>${expense.description}</td>
                 <td><span class="badge">${expense.category}</span></td>
-                <td>${formatCurrency(expense.amount)}</td>
+                <td class="num-en">${formatCurrency(expense.amount)}</td>
                 <td>
                     <button class="btn-action delete" onclick="deleteExpense(${expense.id})" title="حذف">
                         <i class="fas fa-trash"></i>
@@ -336,7 +438,7 @@ function displayExpensesTable() {
             </tbody>
         </table>
         <div class="mt-3">
-            <strong>إجمالي المصروفات: ${formatCurrency(totalExpenses)}</strong>
+            <strong>إجمالي المصروفات: <span class="num-en">${formatCurrency(totalExpenses)}</span></strong>
         </div>
     `;
     
@@ -376,9 +478,9 @@ function displayUsersTable() {
         
         html += `
             <tr>
-                <td>${user.username}</td>
+                <td class="num-en">${user.username}</td>
                 <td>${user.fullName}</td>
-                <td>${user.email}</td>
+                <td class="num-en">${user.email}</td>
                 <td>${user.role}</td>
                 <td>${activeBadge}</td>
                 <td>
@@ -430,10 +532,10 @@ function displayUpcomingBookings() {
     upcomingBookings.forEach(booking => {
         html += `
             <tr>
-                <td>${formatDate(booking.date)}</td>
+                <td class="num-en">${formatDate(booking.date)}</td>
                 <td>${booking.customerName}</td>
-                <td>${booking.phone}</td>
-                <td>${formatCurrency(booking.totalAmount)}</td>
+                <td class="num-en">${booking.phone}</td>
+                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
             </tr>
         `;
     });
@@ -497,7 +599,13 @@ function drawRevenueChart() {
                     ticks: {
                         callback: function(value) {
                             return formatCurrency(value);
-                        }
+                        },
+                        font: { family: 'Segoe UI, sans-serif' } // للأرقام الإنجليزية
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { family: "'Tajawal', sans-serif" }
                     }
                 }
             }
@@ -542,16 +650,19 @@ function drawBookingsChart() {
 }
 
 /**
- * عرض نموذج إضافة حجز
+ * عرض نموذج إضافة حجز (تم تحديثها لتقبل تاريخ افتراضي)
  */
-function showAddBookingForm() {
+function showAddBookingForm(dateStr = null) {
     currentBookingId = null;
     document.getElementById('bookingModalTitle').textContent = 'إضافة حجز جديد';
     document.getElementById('bookingForm').reset();
     
-    // تعيين التاريخ الحالي
-    const today = new Date();
-    document.getElementById('bookingDate').valueAsDate = today;
+    // تعيين التاريخ
+    if (dateStr) {
+        document.getElementById('bookingDate').value = dateStr;
+    } else {
+        document.getElementById('bookingDate').valueAsDate = new Date();
+    }
     
     // حساب المتبقي تلقائياً
     setupBookingFormCalculations();
@@ -881,6 +992,13 @@ function showSection(sectionId) {
     document.querySelectorAll(`[href="#${sectionId}"], [onclick*="'${sectionId}'"]`).forEach(link => {
         link.classList.add('active');
     });
+    
+    // إذا انتقلنا إلى الحجوزات، نقوم بتحديث التقويم ليعرض بشكل صحيح
+    if (sectionId === 'bookings' && calendar) {
+        setTimeout(() => {
+            calendar.updateSize();
+        }, 100);
+    }
 }
 
 /**
@@ -889,7 +1007,7 @@ function showSection(sectionId) {
 function getStatusBadge(status) {
     const badges = {
         'مكتمل': '<span class="badge badge-success">مكتمل</span>',
-        'معلق': '<span class="badge badge-warning">معلق</span>',
+        'معلق': '<span class="badge badge-danger">معلق</span>',
         'جزئي': '<span class="badge badge-warning">جزئي</span>'
     };
     
@@ -970,81 +1088,3 @@ function setupEventListeners() {
 setInterval(() => {
     loadDashboardData();
 }, 5 * 60 * 1000);
-
-
-function initCalendar() {
-    const calendarEl = document.getElementById('calendar');
-    if (!calendarEl) return;
-
-    // تحويل الحجوزات لصيغة يفهمها التقويم
-    const events = bookingsData.map(booking => ({
-        title: `${booking.customerName} (${formatCurrency(booking.remaining)})`,
-        start: dateToISO(booking.date),
-        backgroundColor: booking.paymentStatus === 'مكتمل' ? '#27ae60' : 
-                        booking.paymentStatus === 'معلق' ? '#e74c3c' : '#f39c12',
-        borderColor: 'transparent',
-        extendedProps: { bookingId: booking.id } // لحفظ المعرف
-    }));
-
-    calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        direction: 'rtl',
-        locale: 'ar-sa', // اللغة عربية
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,listMonth'
-        },
-        height: 550, // ارتفاع مناسب
-        events: events,
-        
-        // عند النقر على يوم
-        dateClick: function(info) {
-            handleDateClick(info.dateStr);
-        },
-        
-        // عند النقر على حجز موجود
-        eventClick: function(info) {
-            editBooking(info.event.extendedProps.bookingId);
-        }
-    });
-
-    calendar.render();
-}
-
-// 3. معالجة النقر على التاريخ
-function handleDateClick(dateStr) {
-    // البحث عن حجوزات في هذا اليوم
-    const bookingsOnDay = bookingsData.filter(b => dateToISO(b.date) === dateStr);
-
-    if (bookingsOnDay.length > 0) {
-        // إذا كان هناك حجوزات، نسأل المستخدم
-        Swal.fire({
-            title: `حجوزات يوم ${dateStr}`,
-            text: `يوجد ${bookingsOnDay.length} حجز في هذا اليوم. ماذا تريد أن تفعل؟`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'إضافة حجز جديد',
-            cancelButtonText: 'عرض التفاصيل',
-            confirmButtonColor: '#3498db',
-            cancelButtonColor: '#27ae60'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // فتح نموذج الإضافة
-                openBookingModal(dateStr);
-            } else if (result.dismiss === Swal.DismissReason.cancel) {
-                // الانتقال لجدول الحجوزات وتصفية (يمكن تطويرها لاحقاً)
-                showSection('bookings');
-            }
-        });
-    } else {
-        // لا توجد حجوزات، فتح الإضافة مباشرة
-        openBookingModal(dateStr);
-    }
-}
-
-// دالة مساعدة لفتح المودال مع التاريخ
-function openBookingModal(dateStr) {
-    showAddBookingForm();
-    document.getElementById('bookingDate').value = dateStr;
-}
