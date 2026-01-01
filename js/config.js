@@ -235,10 +235,9 @@ function removeFromLocalStorage(key) {
 function formatPhoneNumber(phone) {
     if (!phone) return '';
     
-    // إزالة جميع الأحرف غير الرقمية
-    const cleaned = phone.replace(/\D/g, '');
+    // التعديل: تحويل القيمة إلى نص صراحةً قبل المعالجة
+    const cleaned = String(phone).replace(/\D/g, '');
     
-    // إضافة رمز الدولة إذا لم يكن موجوداً
     if (cleaned.length === 9) {
         return '+966' + cleaned;
     } else if (cleaned.length === 10) {
@@ -252,74 +251,42 @@ function formatPhoneNumber(phone) {
  * إنشاء رابط واتساب
  */
 function createWhatsAppLink(phone, message) {
+    // استخدام الدالة المصححة أعلاه
     const formattedPhone = formatPhoneNumber(phone).replace(/\D/g, '');
     const encodedMessage = encodeURIComponent(message);
     return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
 }
 
-/**
- * حساب النسبة المئوية
- */
-function calculatePercentage(value, total) {
-    if (total === 0) return 0;
-    return Math.round((value / total) * 100);
+// دالة عرض التنبيهات (Toast)
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i> ${message}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 100);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
-/**
- * تحويل البيانات إلى CSV
- */
-function convertToCSV(data) {
-    if (!data || data.length === 0) return '';
-    
-    const headers = Object.keys(data[0]);
-    const csv = [headers.join(',')];
-    
-    data.forEach(row => {
-        const values = headers.map(header => {
-            const value = row[header];
-            if (typeof value === 'string' && value.includes(',')) {
-                return `"${value}"`;
-            }
-            return value;
-        });
-        csv.push(values.join(','));
-    });
-    
-    return csv.join('\n');
-}
-
-/**
- * تحميل ملف CSV
- */
-function downloadCSV(data, filename) {
-    const csv = convertToCSV(data);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-/**
- * التحقق من الاتصال بالإنترنت
- */
-function isOnline() {
-    return navigator.onLine;
-}
-
-/**
- * إضافة أسلوب CSS ديناميكي
- */
-function addStyle(css) {
-    const style = document.createElement('style');
-    style.textContent = css;
-    document.head.appendChild(style);
+// إضافة ستايل التنبيهات
+const style = document.createElement('style');
+style.textContent = `
+    .toast-notification {
+        position: fixed; bottom: 20px; left: 20px; background: white;
+        padding: 15px 20px; border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center;
+        gap: 10px; opacity: 0; transform: translateX(400px); transition: all 0.3s ease;
+        z-index: 9999; max-width: 300px;
+    }
+    .toast-notification.show { opacity: 1; transform: translateX(0); }
+    .toast-notification.toast-success { border-right: 4px solid #27ae60; color: #27ae60; }
+    .toast-notification.toast-error { border-right: 4px solid #e74c3c; color: #e74c3c; }
+    .toast-notification.toast-info { border-right: 4px solid #3498db; color: #3498db; }
+`;
+document.head.appendChild(style);
 }
 
 /**
