@@ -58,12 +58,12 @@ const USER_ROLES = {
  * تنسيق الأرقام بفواصل الآلاف
  */
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('ar-SA', {
+    return new Intl.NumberFormat('en-US', { // تغيير إلى en-US
         style: 'currency',
         currency: 'SAR',
         minimumFractionDigits: 0,
         maximumFractionDigits: 2
-    }).format(amount);
+    }).format(amount).replace('SAR', 'ر.س'); // استبدال الرمز يدوياً للحفاظ على العربية
 }
 
 /**
