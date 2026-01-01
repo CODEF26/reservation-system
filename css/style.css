@@ -1,6 +1,6 @@
 /* ============================================
    نظام إدارة حجوزات الاستراحات والشاليهات
-   ملف CSS الرئيسي - النسخة المصححة والشاملة
+   ملف CSS الرئيسي - النسخة المصححة (Fix Tabs)
    ============================================ */
 
 :root {
@@ -40,14 +40,12 @@ html, body {
     color: var(--primary-color);
     direction: rtl;
     text-align: right;
-    padding-top: 70px; /* ضروري لعدم اختفاء المحتوى تحت البار العلوي */
+    padding-top: 70px;
 }
 
 /* ============================================
-   1. تخطيط الصفحة والتنقل (Navigation & Layout)
+   1. القائمة العلوية (Navbar) - اللون الأبيض هنا فقط
    ============================================ */
-
-/* الشريط العلوي */
 .navbar {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -62,13 +60,15 @@ html, body {
 
 .navbar-brand i { margin-left: 10px; }
 
-.nav-link {
+/* إصلاح: تخصيص اللون الأبيض لروابط النافبار فقط */
+.navbar-nav .nav-link {
     color: rgba(255, 255, 255, 0.8) !important;
     margin: 0 10px;
     transition: var(--transition);
 }
 
-.nav-link:hover, .nav-link.active {
+.navbar-nav .nav-link:hover, 
+.navbar-nav .nav-link.active {
     color: white !important;
     border-bottom: 2px solid white;
 }
@@ -101,7 +101,9 @@ html, body {
     color: var(--primary-color);
 }
 
-/* القائمة الجانبية */
+/* ============================================
+   2. القائمة الجانبية (Sidebar)
+   ============================================ */
 .sidebar {
     background: white;
     border-radius: 10px;
@@ -143,21 +145,60 @@ html, body {
     text-align: center;
 }
 
-/* المحتوى الرئيسي وإدارة الأقسام (Critical for Tabs) */
-.main-content { padding: 20px 0; }
-
-/* هذا هو الجزء المسؤول عن إخفاء وإظهار الصفحات */
-.page-section {
-    display: none; /* إخفاء الكل افتراضياً */
+/* ============================================
+   3. التبويبات الداخلية (Tabs Fix) - إصلاح الاختفاء والتداخل
+   ============================================ */
+   
+/* تنسيق روابط التبويبات (الإيرادات، المصروفات...) */
+.nav-tabs .nav-link {
+    color: #7f8c8d !important; /* لون رمادي واضح */
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 20px;
+    font-weight: 600;
+    background: transparent;
 }
 
-.page-section.active {
-    display: block; /* إظهار القسم النشط فقط */
+.nav-tabs .nav-link:hover {
+    color: var(--secondary-color) !important;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--secondary-color) !important; /* لون أزرق عند التفعيل */
+    border-bottom-color: var(--secondary-color);
+    background-color: transparent;
+}
+
+.tab-content {
+    padding: 20px 0;
+}
+
+/* إصلاح مشكلة التداخل: التأكد من إخفاء التبويبات غير النشطة */
+.tab-content > .tab-pane {
+    display: none !important; /* إجبار الإخفاء */
+}
+
+.tab-content > .tab-pane.active {
+    display: block !important; /* إجبار الظهور للنشط فقط */
     animation: fadeIn 0.3s ease-in;
 }
 
 /* ============================================
-   2. الكروت (KPI Cards)
+   4. إدارة الصفحات الرئيسية (Sections)
+   ============================================ */
+.main-content { padding: 20px 0; }
+
+.page-section {
+    display: none;
+}
+
+.page-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* ============================================
+   5. الكروت (KPI Cards)
    ============================================ */
 .kpi-card {
     background: white;
@@ -239,7 +280,7 @@ html, body {
 .kpi-card.pending .kpi-icon { color: #9b59b6; }
 
 /* ============================================
-   3. العناصر العامة (Typography, Buttons, Forms)
+   6. العناصر العامة (Typography, Buttons, Forms)
    ============================================ */
 h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
@@ -322,7 +363,7 @@ a:hover { color: #2980b9; }
 }
 
 /* ============================================
-   4. الجداول والحاويات (Tables & Containers)
+   7. الجداول والحاويات (Tables & Containers)
    ============================================ */
 .table-container {
     background: white;
@@ -369,23 +410,6 @@ a:hover { color: #2980b9; }
     position: relative;
     height: 400px;
 }
-
-/* Tabs Internal (داخل الصفحات) */
-.nav-tabs { border-bottom: 2px solid #e0e0e0; gap: 0; margin-bottom: 20px; }
-.nav-tabs .nav-link {
-    color: #7f8c8d;
-    border: none;
-    border-bottom: 3px solid transparent;
-    padding: 12px 20px;
-    font-weight: 600;
-}
-.nav-tabs .nav-link:hover { color: var(--secondary-color); }
-.nav-tabs .nav-link.active {
-    color: var(--secondary-color);
-    border-bottom-color: var(--secondary-color);
-    background-color: transparent;
-}
-.tab-content { padding: 10px 0; }
 
 /* Badges */
 .badge {
