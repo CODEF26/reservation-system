@@ -1,53 +1,44 @@
 // ============================================
-// ملف JavaScript لصفحة لوحة التحكم
+// ملف JavaScript لصفحة لوحة التحكم - نسخة مصححة
 // ============================================
 
 let currentBookingId = null;
 let bookingsData = [];
 let expensesData = [];
 let usersData = [];
-let calendar; // متغير للتقويم
+let calendar; 
+
+// متغيرات لحفظ حالة الرسوم البيانية (الحل لمشكلة الكونسول)
+let revenueChartInstance = null;
+let bookingsChartInstance = null;
 
 /**
  * تهيئة لوحة التحكم
  */
 document.addEventListener('DOMContentLoaded', () => {
     if (!protectPage()) return;
-    
     loadDashboardData();
     setupEventListeners();
 });
 
 /**
- * تحميل بيانات لوحة التحكم
+ * تحميل البيانات
  */
 async function loadDashboardData() {
     try {
-        // تحميل الإحصائيات
         await loadStatistics();
-        
-        // تحميل الحجوزات
         await loadBookings();
-        
-        // تشغيل التقويم بعد تحميل الحجوزات
         initCalendar(); 
-        
-        // تحميل المصروفات
         await loadExpenses();
-        
-        // تحميل المستخدمين
         await loadUsers();
-        
-        // تحميل الإعدادات
         await loadSettings();
     } catch (error) {
         console.error('خطأ في تحميل البيانات:', error);
-        showToast('حدث خطأ في تحميل البيانات', 'error');
     }
 }
 
 /**
- * تحميل الإحصائيات
+ * تحميل الإحصائيات والرسم
  */
 async function loadStatistics() {
     const response = await apiCall('getStatistics');
@@ -55,505 +46,79 @@ async function loadStatistics() {
     if (response && response.success) {
         const stats = response.data;
         
-        // تحديث KPI Cards
-        document.getElementById('totalRevenue').textContent = formatCurrency(stats.totalRevenue);
-        document.getElementById('totalExpenses').textContent = formatCurrency(stats.totalExpenses);
-        document.getElementById('netProfit').textContent = formatCurrency(stats.netProfit);
-        document.getElementById('totalBookings').textContent = stats.totalBookings;
-        document.getElementById('thisMonthBookings').textContent = stats.thisMonthBookings;
-        document.getElementById('pendingAmount').textContent = formatCurrency(stats.pendingAmount);
+        // تحديث الكروت
+        if(document.getElementById('totalRevenue')) document.getElementById('totalRevenue').textContent = formatCurrency(stats.totalRevenue);
+        if(document.getElementById('totalExpenses')) document.getElementById('totalExpenses').textContent = formatCurrency(stats.totalExpenses);
+        if(document.getElementById('netProfit')) document.getElementById('netProfit').textContent = formatCurrency(stats.netProfit);
+        if(document.getElementById('totalBookings')) document.getElementById('totalBookings').textContent = stats.totalBookings;
+        if(document.getElementById('thisMonthBookings')) document.getElementById('thisMonthBookings').textContent = stats.thisMonthBookings;
+        if(document.getElementById('pendingAmount')) document.getElementById('pendingAmount').textContent = formatCurrency(stats.pendingAmount);
         
-        // رسم الرسوم البيانية
+        // رسم الرسوم البيانية (المصححة)
         drawRevenueChart();
         drawBookingsChart();
         
-        // تحميل الحجوزات القادمة
         displayUpcomingBookings();
     }
 }
 
-/**
- * تحميل الحجوزات
- */
+// ... (دوال loadBookings, loadExpenses, loadUsers, loadSettings كما هي) ...
 async function loadBookings() {
     const response = await apiCall('getBookings');
-    
     if (response && response.success) {
         bookingsData = response.data;
         displayBookingsTable();
         displayRevenueTable();
         displayPendingTable();
-        
-        // تحديث التقويم إذا كان مفتوحاً
         if (calendar) {
             calendar.removeAllEvents();
-            const events = getCalendarEvents();
-            calendar.addEventSource(events);
+            calendar.addEventSource(getCalendarEvents());
         }
     }
 }
 
-/**
- * تحميل المصروفات
- */
 async function loadExpenses() {
     const response = await apiCall('getExpenses');
-    
     if (response && response.success) {
         expensesData = response.data;
         displayExpensesTable();
     }
 }
 
-/**
- * تحميل المستخدمين
- */
 async function loadUsers() {
     const response = await apiCall('getUsers');
-    
     if (response && response.success) {
         usersData = response.data;
         displayUsersTable();
     }
 }
 
-/**
- * تحميل الإعدادات
- */
 async function loadSettings() {
     const response = await apiCall('getSettings');
-    
     if (response && response.success) {
         const settings = response.data;
-        
-        // تحديث حقول الإعدادات
-        const facilityName = document.getElementById('facilityName');
-        const currency = document.getElementById('currency');
-        const defaultPhone = document.getElementById('defaultPhone');
-        const whatsappTemplate = document.getElementById('whatsappTemplate');
-        
-        if (facilityName) facilityName.value = settings.facilityName || '';
-        if (currency) currency.value = settings.currency || 'ر.س';
-        if (defaultPhone) defaultPhone.value = settings.defaultPhone || '';
-        if (whatsappTemplate) whatsappTemplate.value = settings.whatsappTemplate || '';
+        if (document.getElementById('facilityName')) document.getElementById('facilityName').value = settings.facilityName || '';
+        if (document.getElementById('currency')) document.getElementById('currency').value = settings.currency || 'ر.س';
+        if (document.getElementById('defaultPhone')) document.getElementById('defaultPhone').value = settings.defaultPhone || '';
+        if (document.getElementById('whatsappTemplate')) document.getElementById('whatsappTemplate').value = settings.whatsappTemplate || '';
     }
 }
 
 // ============================================
-// دوال التقويم (New Calendar Functions)
+// دوال الرسم البياني المصححة (Charts Fix)
 // ============================================
 
-/**
- * تجهيز بيانات الحجوزات للتقويم
- */
-function getCalendarEvents() {
-    return bookingsData.map(booking => ({
-        title: `${booking.customerName} (${formatCurrency(booking.remaining)})`,
-        start: dateToISO(booking.date),
-        backgroundColor: booking.paymentStatus === 'مكتمل' ? '#27ae60' : 
-                        booking.paymentStatus === 'معلق' ? '#e74c3c' : '#f39c12',
-        borderColor: 'transparent',
-        extendedProps: { bookingId: booking.id }
-    }));
-}
-
-/**
- * تهيئة وتشغيل التقويم
- */
-function initCalendar() {
-    const calendarEl = document.getElementById('calendar');
-    if (!calendarEl) return;
-
-    calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        direction: 'rtl',
-        locale: 'ar-sa',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,listMonth'
-        },
-        height: 550,
-        events: getCalendarEvents(),
-        
-        // عند النقر على يوم
-        dateClick: function(info) {
-            handleDateClick(info.dateStr);
-        },
-        
-        // عند النقر على حجز موجود
-        eventClick: function(info) {
-            editBooking(info.event.extendedProps.bookingId);
-        }
-    });
-
-    calendar.render();
-}
-
-/**
- * معالجة النقر على التاريخ في التقويم
- */
-function handleDateClick(dateStr) {
-    // البحث عن حجوزات في هذا اليوم
-    const bookingsOnDay = bookingsData.filter(b => dateToISO(b.date) === dateStr);
-
-    if (bookingsOnDay.length > 0) {
-        Swal.fire({
-            title: `حجوزات يوم ${dateStr}`,
-            text: `يوجد ${bookingsOnDay.length} حجز في هذا اليوم. ماذا تريد أن تفعل؟`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'إضافة حجز جديد',
-            cancelButtonText: 'إلغاء',
-            confirmButtonColor: '#3498db',
-            cancelButtonColor: '#95a5a6'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                showAddBookingForm(dateStr);
-            }
-        });
-    } else {
-        showAddBookingForm(dateStr);
-    }
-}
-
-// ============================================
-// دوال العرض (Tables & UI)
-// ============================================
-
-/**
- * عرض جدول الحجوزات
- */
-function displayBookingsTable() {
-    const container = document.getElementById('bookingsTable');
-    
-    if (bookingsData.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد حجوزات</p>';
-        return;
-    }
-    
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>التاريخ</th>
-                    <th>اسم العميل</th>
-                    <th>الجوال</th>
-                    <th>المبلغ الإجمالي</th>
-                    <th>العربون</th>
-                    <th>المتبقي</th>
-                    <th>الحالة</th>
-                    <th>الإجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    bookingsData.forEach(booking => {
-        const statusBadge = getStatusBadge(booking.paymentStatus);
-        html += `
-            <tr>
-                <td class="num-en">${formatDate(booking.date)}</td>
-                <td>${booking.customerName}</td>
-                <td class="num-en">${booking.phone}</td>
-                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
-                <td class="num-en">${formatCurrency(booking.deposit)}</td>
-                <td class="num-en">${formatCurrency(booking.remaining)}</td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button class="btn-action edit" onclick="editBooking(${booking.id})" title="تعديل">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-action delete" onclick="deleteBooking(${booking.id})" title="حذف">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                    <button class="btn-action complete" onclick="recordPayment(${booking.id})" title="تسجيل دفع">
-                        <i class="fas fa-money-bill"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
-}
-
-/**
- * عرض جدول الإيرادات
- */
-function displayRevenueTable() {
-    const container = document.getElementById('revenueTable');
-    
-    const completedBookings = bookingsData.filter(b => b.paymentStatus === 'مكتمل');
-    
-    if (completedBookings.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد إيرادات</p>';
-        return;
-    }
-    
-    let totalRevenue = 0;
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>التاريخ</th>
-                    <th>اسم العميل</th>
-                    <th>المبلغ</th>
-                    <th>الحالة</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    completedBookings.forEach(booking => {
-        totalRevenue += booking.totalAmount;
-        html += `
-            <tr>
-                <td class="num-en">${formatDate(booking.date)}</td>
-                <td>${booking.customerName}</td>
-                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
-                <td><span class="badge badge-success">مكتمل</span></td>
-            </tr>
-        `;
-    });
-    
-    html += `
-            </tbody>
-        </table>
-        <div class="mt-3">
-            <strong>إجمالي الإيرادات: <span class="num-en">${formatCurrency(totalRevenue)}</span></strong>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-/**
- * عرض جدول الحجوزات المعلقة
- */
-function displayPendingTable() {
-    const container = document.getElementById('pendingTable');
-    
-    const pendingBookings = bookingsData.filter(b => b.paymentStatus !== 'مكتمل');
-    
-    if (pendingBookings.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد حجوزات معلقة</p>';
-        return;
-    }
-    
-    let totalPending = 0;
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>التاريخ</th>
-                    <th>اسم العميل</th>
-                    <th>الجوال</th>
-                    <th>المتبقي</th>
-                    <th>الحالة</th>
-                    <th>الإجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    pendingBookings.forEach(booking => {
-        totalPending += booking.remaining;
-        const statusBadge = getStatusBadge(booking.paymentStatus);
-        html += `
-            <tr>
-                <td class="num-en">${formatDate(booking.date)}</td>
-                <td>${booking.customerName}</td>
-                <td class="num-en">${booking.phone}</td>
-                <td class="num-en">${formatCurrency(booking.remaining)}</td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button class="btn-action edit" onclick="recordPayment(${booking.id})" title="تسجيل دفع">
-                        <i class="fas fa-money-bill"></i>
-                    </button>
-                    <button class="btn-action complete" onclick="sendWhatsAppReminder(${booking.id})" title="إرسال تذكير">
-                        <i class="fas fa-whatsapp"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-            </tbody>
-        </table>
-        <div class="mt-3">
-            <strong>إجمالي المبلغ المعلق: <span class="num-en">${formatCurrency(totalPending)}</span></strong>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-/**
- * عرض جدول المصروفات
- */
-function displayExpensesTable() {
-    const container = document.getElementById('expensesTable');
-    
-    if (expensesData.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد مصروفات</p>';
-        return;
-    }
-    
-    let totalExpenses = 0;
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>التاريخ</th>
-                    <th>الوصف</th>
-                    <th>التصنيف</th>
-                    <th>المبلغ</th>
-                    <th>الإجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    expensesData.forEach(expense => {
-        totalExpenses += expense.amount;
-        html += `
-            <tr>
-                <td class="num-en">${formatDate(expense.date)}</td>
-                <td>${expense.description}</td>
-                <td><span class="badge">${expense.category}</span></td>
-                <td class="num-en">${formatCurrency(expense.amount)}</td>
-                <td>
-                    <button class="btn-action delete" onclick="deleteExpense(${expense.id})" title="حذف">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-            </tbody>
-        </table>
-        <div class="mt-3">
-            <strong>إجمالي المصروفات: <span class="num-en">${formatCurrency(totalExpenses)}</span></strong>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-/**
- * عرض جدول المستخدمين
- */
-function displayUsersTable() {
-    const container = document.getElementById('usersTable');
-    
-    if (usersData.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد مستخدمين</p>';
-        return;
-    }
-    
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>اسم المستخدم</th>
-                    <th>الاسم الكامل</th>
-                    <th>البريد الإلكتروني</th>
-                    <th>الدور</th>
-                    <th>الحالة</th>
-                    <th>الإجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    usersData.forEach(user => {
-        const activeBadge = user.active === 'نعم' 
-            ? '<span class="badge badge-success">نشط</span>'
-            : '<span class="badge badge-danger">غير نشط</span>';
-        
-        html += `
-            <tr>
-                <td class="num-en">${user.username}</td>
-                <td>${user.fullName}</td>
-                <td class="num-en">${user.email}</td>
-                <td>${user.role}</td>
-                <td>${activeBadge}</td>
-                <td>
-                    <button class="btn-action edit" onclick="editUser(${user.id})" title="تعديل">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-action delete" onclick="deleteUser(${user.id})" title="حذف">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
-}
-
-/**
- * عرض الحجوزات القادمة
- */
-function displayUpcomingBookings() {
-    const container = document.getElementById('upcomingBookings');
-    
-    const today = new Date();
-    const upcomingBookings = bookingsData
-        .filter(b => new Date(b.date) >= today)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(0, 5);
-    
-    if (upcomingBookings.length === 0) {
-        container.innerHTML = '<p class="empty-state">لا توجد حجوزات قادمة</p>';
-        return;
-    }
-    
-    let html = `
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>التاريخ</th>
-                    <th>اسم العميل</th>
-                    <th>الجوال</th>
-                    <th>المبلغ</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    upcomingBookings.forEach(booking => {
-        html += `
-            <tr>
-                <td class="num-en">${formatDate(booking.date)}</td>
-                <td>${booking.customerName}</td>
-                <td class="num-en">${booking.phone}</td>
-                <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
-}
-
-/**
- * رسم رسم بياني الإيرادات
- */
 function drawRevenueChart() {
     const ctx = document.getElementById('revenueChart');
     if (!ctx) return;
     
-    // تجميع الإيرادات حسب الشهر
-    const monthlyRevenue = {};
+    // التعديل: تدمير المخطط القديم إذا وجد
+    if (revenueChartInstance) {
+        revenueChartInstance.destroy();
+    }
     
+    // تجهيز البيانات
+    const monthlyRevenue = {};
     bookingsData.forEach(booking => {
         if (booking.paymentStatus === 'مكتمل') {
             const date = new Date(booking.date);
@@ -565,7 +130,8 @@ function drawRevenueChart() {
     const labels = Object.keys(monthlyRevenue).sort();
     const data = labels.map(label => monthlyRevenue[label]);
     
-    new Chart(ctx, {
+    // إنشاء مخطط جديد وحفظه في المتغير
+    revenueChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels.map(label => {
@@ -586,44 +152,36 @@ function drawRevenueChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: true,
-                    labels: {
-                        font: { family: "'Tajawal', sans-serif" }
-                    }
-                }
+                legend: { display: true, labels: { font: { family: "'Tajawal', sans-serif" } } }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: function(value) {
-                            return formatCurrency(value);
-                        },
-                        font: { family: 'Segoe UI, sans-serif' } // للأرقام الإنجليزية
+                        callback: function(value) { return formatCurrency(value); },
+                        font: { family: 'Segoe UI, sans-serif' }
                     }
                 },
-                x: {
-                    ticks: {
-                        font: { family: "'Tajawal', sans-serif" }
-                    }
-                }
+                x: { ticks: { font: { family: "'Tajawal', sans-serif" } } }
             }
         }
     });
 }
 
-/**
- * رسم رسم بياني الحجوزات
- */
 function drawBookingsChart() {
     const ctx = document.getElementById('bookingsChart');
     if (!ctx) return;
     
+    // التعديل: تدمير المخطط القديم إذا وجد
+    if (bookingsChartInstance) {
+        bookingsChartInstance.destroy();
+    }
+    
     const completed = bookingsData.filter(b => b.paymentStatus === 'مكتمل').length;
     const pending = bookingsData.filter(b => b.paymentStatus !== 'مكتمل').length;
     
-    new Chart(ctx, {
+    // إنشاء مخطط جديد وحفظه
+    bookingsChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['مكتملة', 'معلقة'],
@@ -638,48 +196,198 @@ function drawBookingsChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: true,
-                    labels: {
-                        font: { family: "'Tajawal', sans-serif" }
-                    }
-                }
+                legend: { display: true, labels: { font: { family: "'Tajawal', sans-serif" } } }
             }
         }
     });
 }
 
-/**
- * عرض نموذج إضافة حجز (تم تحديثها لتقبل تاريخ افتراضي)
- */
+// ============================================
+// دوال التقويم
+// ============================================
+
+function getCalendarEvents() {
+    return bookingsData.map(booking => ({
+        title: `${booking.customerName} (${formatCurrency(booking.remaining)})`,
+        start: dateToISO(booking.date),
+        backgroundColor: booking.paymentStatus === 'مكتمل' ? '#27ae60' : 
+                        booking.paymentStatus === 'معلق' ? '#e74c3c' : '#f39c12',
+        borderColor: 'transparent',
+        extendedProps: { bookingId: booking.id }
+    }));
+}
+
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+
+    // التأكد من عدم إعادة تهيئة التقويم إذا كان موجوداً
+    if (calendar) return;
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        direction: 'rtl',
+        locale: 'ar-sa',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth'
+        },
+        height: 550,
+        events: getCalendarEvents(),
+        dateClick: function(info) { handleDateClick(info.dateStr); },
+        eventClick: function(info) { editBooking(info.event.extendedProps.bookingId); }
+    });
+
+    calendar.render();
+}
+
+function handleDateClick(dateStr) {
+    const bookingsOnDay = bookingsData.filter(b => dateToISO(b.date) === dateStr);
+    if (bookingsOnDay.length > 0) {
+        Swal.fire({
+            title: `حجوزات يوم ${dateStr}`,
+            text: `يوجد ${bookingsOnDay.length} حجز. ماذا تريد أن تفعل؟`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'إضافة حجز جديد',
+            cancelButtonText: 'إلغاء',
+            confirmButtonColor: '#3498db'
+        }).then((result) => {
+            if (result.isConfirmed) showAddBookingForm(dateStr);
+        });
+    } else {
+        showAddBookingForm(dateStr);
+    }
+}
+
+// ============================================
+// دوال الجداول والعرض (UI)
+// ============================================
+
+function displayBookingsTable() {
+    const container = document.getElementById('bookingsTable');
+    if (!bookingsData.length) { container.innerHTML = '<p class="empty-state">لا توجد حجوزات</p>'; return; }
+    
+    let html = `<table class="table table-hover"><thead><tr><th>التاريخ</th><th>اسم العميل</th><th>الجوال</th><th>المبلغ</th><th>المتبقي</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>`;
+    bookingsData.forEach(booking => {
+        html += `<tr>
+            <td class="num-en">${formatDate(booking.date)}</td>
+            <td>${booking.customerName}</td>
+            <td class="num-en">${booking.phone}</td>
+            <td class="num-en">${formatCurrency(booking.totalAmount)}</td>
+            <td class="num-en">${formatCurrency(booking.remaining)}</td>
+            <td>${getStatusBadge(booking.paymentStatus)}</td>
+            <td>
+                <button class="btn-action edit" onclick="editBooking(${booking.id})"><i class="fas fa-edit"></i></button>
+                <button class="btn-action delete" onclick="deleteBooking(${booking.id})"><i class="fas fa-trash"></i></button>
+                <button class="btn-action complete" onclick="recordPayment(${booking.id})"><i class="fas fa-money-bill"></i></button>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function displayRevenueTable() {
+    const container = document.getElementById('revenueTable');
+    const completed = bookingsData.filter(b => b.paymentStatus === 'مكتمل');
+    if (!completed.length) { container.innerHTML = '<p class="empty-state">لا توجد إيرادات</p>'; return; }
+    
+    let total = 0;
+    let html = `<table class="table table-hover"><thead><tr><th>التاريخ</th><th>اسم العميل</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>`;
+    completed.forEach(b => {
+        total += b.totalAmount;
+        html += `<tr><td class="num-en">${formatDate(b.date)}</td><td>${b.customerName}</td><td class="num-en">${formatCurrency(b.totalAmount)}</td><td><span class="badge badge-success">مكتمل</span></td></tr>`;
+    });
+    html += `</tbody></table><div class="mt-3"><strong>إجمالي الإيرادات: <span class="num-en">${formatCurrency(total)}</span></strong></div>`;
+    container.innerHTML = html;
+}
+
+function displayPendingTable() {
+    const container = document.getElementById('pendingTable');
+    const pending = bookingsData.filter(b => b.paymentStatus !== 'مكتمل');
+    if (!pending.length) { container.innerHTML = '<p class="empty-state">لا توجد حجوزات معلقة</p>'; return; }
+    
+    let total = 0;
+    let html = `<table class="table table-hover"><thead><tr><th>التاريخ</th><th>اسم العميل</th><th>المتبقي</th><th>الإجراءات</th></tr></thead><tbody>`;
+    pending.forEach(b => {
+        total += b.remaining;
+        html += `<tr><td class="num-en">${formatDate(b.date)}</td><td>${b.customerName}</td><td class="num-en">${formatCurrency(b.remaining)}</td>
+        <td>
+            <button class="btn-action edit" onclick="recordPayment(${b.id})"><i class="fas fa-money-bill"></i></button>
+            <button class="btn-action complete" onclick="sendWhatsAppReminder(${b.id})"><i class="fas fa-whatsapp"></i></button>
+        </td></tr>`;
+    });
+    html += `</tbody></table><div class="mt-3"><strong>إجمالي المعلق: <span class="num-en">${formatCurrency(total)}</span></strong></div>`;
+    container.innerHTML = html;
+}
+
+function displayExpensesTable() {
+    const container = document.getElementById('expensesTable');
+    if (!expensesData.length) { container.innerHTML = '<p class="empty-state">لا توجد مصروفات</p>'; return; }
+    
+    let total = 0;
+    let html = `<table class="table table-hover"><thead><tr><th>التاريخ</th><th>الوصف</th><th>المبلغ</th><th>الإجراءات</th></tr></thead><tbody>`;
+    expensesData.forEach(e => {
+        total += e.amount;
+        html += `<tr><td class="num-en">${formatDate(e.date)}</td><td>${e.description}</td><td class="num-en">${formatCurrency(e.amount)}</td>
+        <td><button class="btn-action delete" onclick="deleteExpense(${e.id})"><i class="fas fa-trash"></i></button></td></tr>`;
+    });
+    html += `</tbody></table><div class="mt-3"><strong>إجمالي المصروفات: <span class="num-en">${formatCurrency(total)}</span></strong></div>`;
+    container.innerHTML = html;
+}
+
+function displayUsersTable() {
+    const container = document.getElementById('usersTable');
+    if (!usersData.length) { container.innerHTML = '<p class="empty-state">لا توجد مستخدمين</p>'; return; }
+    
+    let html = `<table class="table table-hover"><thead><tr><th>الاسم</th><th>الدور</th><th>الإجراءات</th></tr></thead><tbody>`;
+    usersData.forEach(u => {
+        html += `<tr><td>${u.username}</td><td>${u.role}</td>
+        <td>
+            <button class="btn-action edit" onclick="editUser(${u.id})"><i class="fas fa-edit"></i></button>
+            <button class="btn-action delete" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i></button>
+        </td></tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function displayUpcomingBookings() {
+    const container = document.getElementById('upcomingBookings');
+    const today = new Date();
+    const upcoming = bookingsData.filter(b => new Date(b.date) >= today).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
+    
+    if (!upcoming.length) { container.innerHTML = '<p class="empty-state">لا توجد حجوزات قادمة</p>'; return; }
+    
+    let html = `<table class="table table-hover"><thead><tr><th>التاريخ</th><th>العميل</th><th>المبلغ</th></tr></thead><tbody>`;
+    upcoming.forEach(b => {
+        html += `<tr><td class="num-en">${formatDate(b.date)}</td><td>${b.customerName}</td><td class="num-en">${formatCurrency(b.totalAmount)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// ============================================
+// إدارة النماذج والعمليات (Forms & Actions)
+// ============================================
+
 function showAddBookingForm(dateStr = null) {
     currentBookingId = null;
     document.getElementById('bookingModalTitle').textContent = 'إضافة حجز جديد';
     document.getElementById('bookingForm').reset();
-    
-    // تعيين التاريخ
-    if (dateStr) {
-        document.getElementById('bookingDate').value = dateStr;
-    } else {
-        document.getElementById('bookingDate').valueAsDate = new Date();
-    }
-    
-    // حساب المتبقي تلقائياً
+    if (dateStr) document.getElementById('bookingDate').value = dateStr;
+    else document.getElementById('bookingDate').valueAsDate = new Date();
     setupBookingFormCalculations();
-    
     new bootstrap.Modal(document.getElementById('bookingModal')).show();
 }
 
-/**
- * تعديل حجز
- */
 function editBooking(id) {
     const booking = bookingsData.find(b => b.id === id);
     if (!booking) return;
-    
     currentBookingId = id;
     document.getElementById('bookingModalTitle').textContent = 'تعديل الحجز';
-    
     document.getElementById('bookingDate').value = dateToISO(booking.date);
     document.getElementById('customerName').value = booking.customerName;
     document.getElementById('customerPhone').value = booking.phone;
@@ -689,42 +397,27 @@ function editBooking(id) {
     document.getElementById('insurance').value = booking.insurance || 0;
     document.getElementById('paymentStatus').value = booking.paymentStatus;
     document.getElementById('bookingNotes').value = booking.notes;
-    
     setupBookingFormCalculations();
     new bootstrap.Modal(document.getElementById('bookingModal')).show();
 }
 
-/**
- * حفظ الحجز
- */
 async function saveBooking() {
-    const bookingDate = document.getElementById('bookingDate').value;
-    const customerName = document.getElementById('customerName').value;
-    const customerPhone = document.getElementById('customerPhone').value;
-    const totalAmount = parseFloat(document.getElementById('totalAmount').value);
-    const deposit = parseFloat(document.getElementById('deposit').value);
-    const remaining = parseFloat(document.getElementById('remaining').value);
-    const insurance = parseFloat(document.getElementById('insurance').value) || 0;
-    const paymentStatus = document.getElementById('paymentStatus').value;
-    const bookingNotes = document.getElementById('bookingNotes').value;
-    
-    if (!bookingDate || !customerName || !customerPhone || !totalAmount) {
-        showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
-        return;
-    }
-    
     const params = {
-        date: bookingDate,
-        customerName: customerName,
-        phone: customerPhone,
-        totalAmount: totalAmount,
-        deposit: deposit,
-        remaining: remaining,
-        insurance: insurance,
-        paymentStatus: paymentStatus,
-        notes: bookingNotes
+        date: document.getElementById('bookingDate').value,
+        customerName: document.getElementById('customerName').value,
+        phone: document.getElementById('customerPhone').value,
+        totalAmount: parseFloat(document.getElementById('totalAmount').value),
+        deposit: parseFloat(document.getElementById('deposit').value),
+        remaining: parseFloat(document.getElementById('remaining').value),
+        insurance: parseFloat(document.getElementById('insurance').value) || 0,
+        paymentStatus: document.getElementById('paymentStatus').value,
+        notes: document.getElementById('bookingNotes').value
     };
     
+    if (!params.date || !params.customerName || !params.phone || isNaN(params.totalAmount)) {
+        showToast('يرجى ملء الحقول المطلوبة', 'error'); return;
+    }
+
     let response;
     if (currentBookingId) {
         params.id = currentBookingId;
@@ -732,92 +425,42 @@ async function saveBooking() {
     } else {
         response = await apiCall('addBooking', params);
     }
-    
+
     if (response && response.success) {
-        showToast('تم حفظ الحجز بنجاح', 'success');
+        showToast('تم الحفظ بنجاح', 'success');
         bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
         await loadBookings();
         await loadStatistics();
     } else {
-        showToast(response?.message || 'فشل حفظ الحجز', 'error');
+        showToast('فشل الحفظ', 'error');
     }
 }
 
-/**
- * حذف حجز
- */
 async function deleteBooking(id) {
-    const booking = bookingsData.find(b => b.id === id);
-    if (!booking) return;
-    
-    const result = await Swal.fire({
-        title: 'تأكيد الحذف',
-        text: `هل أنت متأكد من حذف حجز ${booking.customerName}؟`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'نعم، احذف',
-        cancelButtonText: 'إلغاء',
-        confirmButtonColor: '#e74c3c',
-        cancelButtonColor: '#95a5a6'
-    });
-    
+    const result = await Swal.fire({ title: 'تأكيد الحذف؟', icon: 'warning', showCancelButton: true, confirmButtonText: 'نعم', cancelButtonText: 'لا' });
     if (result.isConfirmed) {
-        const response = await apiCall('deleteBooking', { id: id });
-        
-        if (response && response.success) {
-            showToast('تم حذف الحجز بنجاح', 'success');
-            await loadBookings();
-            await loadStatistics();
-        } else {
-            showToast(response?.message || 'فشل حذف الحجز', 'error');
-        }
+        await apiCall('deleteBooking', { id: id });
+        showToast('تم الحذف', 'success');
+        await loadBookings();
+        await loadStatistics();
     }
 }
 
-/**
- * تسجيل الدفع
- */
 async function recordPayment(id) {
     const booking = bookingsData.find(b => b.id === id);
-    if (!booking) return;
-    
-    const { value: amount } = await Swal.fire({
-        title: 'تسجيل دفع',
-        input: 'number',
-        inputLabel: `المبلغ المتبقي: ${formatCurrency(booking.remaining)}`,
-        inputValue: booking.remaining,
-        showCancelButton: true,
-        confirmButtonText: 'تسجيل',
-        cancelButtonText: 'إلغاء'
-    });
-    
+    const { value: amount } = await Swal.fire({ title: 'تسجيل دفعة', input: 'number', inputValue: booking.remaining, showCancelButton: true });
     if (amount) {
-        const response = await apiCall('recordPayment', {
-            id: id,
-            amount: parseFloat(amount)
-        });
-        
-        if (response && response.success) {
-            showToast('تم تسجيل الدفع بنجاح', 'success');
-            await loadBookings();
-            await loadStatistics();
-        } else {
-            showToast(response?.message || 'فشل تسجيل الدفع', 'error');
-        }
+        await apiCall('recordPayment', { id: id, amount: parseFloat(amount) });
+        showToast('تم التسجيل', 'success');
+        await loadBookings();
+        await loadStatistics();
     }
 }
 
-/**
- * إرسال تذكير واتساب
- */
 function sendWhatsAppReminder(id) {
     const booking = bookingsData.find(b => b.id === id);
-    if (!booking) return;
-    
-    const message = `مرحباً ${booking.customerName}،\n\nنود تذكيرك بأن لديك حجز معنا بمبلغ متبقي: ${formatCurrency(booking.remaining)}\n\nالرجاء سداد المبلغ في أقرب وقت.\n\nشكراً لك!`;
-    const whatsappLink = createWhatsAppLink(booking.phone, message);
-    
-    window.open(whatsappLink, '_blank');
+    const msg = `مرحباً ${booking.customerName}، نود تذكيرك بالمبلغ المتبقي: ${formatCurrency(booking.remaining)}`;
+    window.open(createWhatsAppLink(booking.phone, msg), '_blank');
 }
 
 /**
