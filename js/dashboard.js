@@ -22,23 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadDashboardData() {
     try {
-        // تحميل الإحصائيات
         await loadStatistics();
-        
-        // تحميل الحجوزات
-        await loadBookings();
-        
-        // تحميل المصروفات
+        await loadBookings(); // بعد تحميل الحجوزات
+        initCalendar(); // <-- تشغيل التقويم
         await loadExpenses();
-        
-        // تحميل المستخدمين
         await loadUsers();
-        
-        // تحميل الإعدادات
         await loadSettings();
     } catch (error) {
-        console.error('خطأ في تحميل البيانات:', error);
-        showToast('حدث خطأ في تحميل البيانات', 'error');
+        console.error('Error:', error);
     }
 }
 
@@ -979,3 +970,81 @@ function setupEventListeners() {
 setInterval(() => {
     loadDashboardData();
 }, 5 * 60 * 1000);
+
+
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+
+    // تحويل الحجوزات لصيغة يفهمها التقويم
+    const events = bookingsData.map(booking => ({
+        title: `${booking.customerName} (${formatCurrency(booking.remaining)})`,
+        start: dateToISO(booking.date),
+        backgroundColor: booking.paymentStatus === 'مكتمل' ? '#27ae60' : 
+                        booking.paymentStatus === 'معلق' ? '#e74c3c' : '#f39c12',
+        borderColor: 'transparent',
+        extendedProps: { bookingId: booking.id } // لحفظ المعرف
+    }));
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        direction: 'rtl',
+        locale: 'ar-sa', // اللغة عربية
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth'
+        },
+        height: 550, // ارتفاع مناسب
+        events: events,
+        
+        // عند النقر على يوم
+        dateClick: function(info) {
+            handleDateClick(info.dateStr);
+        },
+        
+        // عند النقر على حجز موجود
+        eventClick: function(info) {
+            editBooking(info.event.extendedProps.bookingId);
+        }
+    });
+
+    calendar.render();
+}
+
+// 3. معالجة النقر على التاريخ
+function handleDateClick(dateStr) {
+    // البحث عن حجوزات في هذا اليوم
+    const bookingsOnDay = bookingsData.filter(b => dateToISO(b.date) === dateStr);
+
+    if (bookingsOnDay.length > 0) {
+        // إذا كان هناك حجوزات، نسأل المستخدم
+        Swal.fire({
+            title: `حجوزات يوم ${dateStr}`,
+            text: `يوجد ${bookingsOnDay.length} حجز في هذا اليوم. ماذا تريد أن تفعل؟`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'إضافة حجز جديد',
+            cancelButtonText: 'عرض التفاصيل',
+            confirmButtonColor: '#3498db',
+            cancelButtonColor: '#27ae60'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // فتح نموذج الإضافة
+                openBookingModal(dateStr);
+            } else if (result.dismiss === Swal.DismissReason.cancel) {
+                // الانتقال لجدول الحجوزات وتصفية (يمكن تطويرها لاحقاً)
+                showSection('bookings');
+            }
+        });
+    } else {
+        // لا توجد حجوزات، فتح الإضافة مباشرة
+        openBookingModal(dateStr);
+    }
+}
+
+// دالة مساعدة لفتح المودال مع التاريخ
+function openBookingModal(dateStr) {
+    showAddBookingForm();
+    document.getElementById('bookingDate').value = dateStr;
+}
